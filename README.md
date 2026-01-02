@@ -1,8 +1,6 @@
 # n8n-nodes-evernote
 
-This is an n8n community node. It lets you use _app/service name_ in your n8n workflows.
-
-_App/service name_ is _one or two sentences describing the service this node integrates with_.
+This is an n8n community node for Evernote. It lets you create, read, update, delete, and search notes, plus list notebooks and tags using an Evernote developer token.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
 
@@ -20,11 +18,14 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ## Operations
 
-_List the operations supported by your node._
+- **Note**: create, read (ENML or HTML), update (replace or append), delete, search (metadata by default, optional full notes).
+- **Notebook**: list notebooks (name, GUID, stack, default flag).
+- **Tag**: list tags (name, GUID, parent GUID).
 
 ## Credentials
 
-_If users need to authenticate with the app/service, provide details here. You should include prerequisites (such as signing up with the service), available authentication methods, and how to set them up._
+- Use an Evernote developer token (personal access token). Add it to the `Evernote API` credential in n8n.
+- Toggle **Use Sandbox** if your token targets the Evernote sandbox environment.
 
 ## Compatibility
 
@@ -32,9 +33,10 @@ Node 24.x is required. Use `nvm use` (with the provided `.nvmrc`) or your versio
 
 ## Usage
 
-_This is an optional section. Use it to help users with any difficult or confusing aspects of the node._
-
-_By the time users are looking for community nodes, they probably already know n8n basics. But if you expect new users, you can link to the [Try it out](https://docs.n8n.io/try-it-out/) documentation to help them get started._
+- **Content formats**: choose Plain Text (wrapped in ENML) or HTML (sanitized to ENML). When reading, you can request raw ENML or simplified HTML.
+- **Update modes**: replace overwrites content; append pulls the current note, adds your new content at the end, and saves.
+- **Attachments**: enable “Add Attachments” and list binary property names (comma-separated). Attachments are hashed (MD5) and injected as `<en-media>` in the note.
+- **Search**: uses Evernote search grammar. Defaults to metadata; enable “Full Notes” to fetch complete notes.
 
 ## Resources
 

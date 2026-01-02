@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-evernote",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Productivity", "Notes"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://dev.evernote.com/doc/"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/artpi/n8n-nodes-evernote#readme"
+			}
+		]
+	}
+}
