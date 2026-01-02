@@ -28,7 +28,7 @@ _If users need to authenticate with the app/service, provide details here. You s
 
 ## Compatibility
 
-_State the minimum n8n version, as well as which versions you test against. You can also include any known version incompatibility issues._
+Node 24.x is required. Use `nvm use` (with the provided `.nvmrc`) or your version manager of choice before installing to satisfy the `engines` and `engine-strict` checks.
 
 ## Usage
 

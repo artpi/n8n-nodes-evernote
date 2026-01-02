@@ -15,6 +15,9 @@
         "type": "git",
         "url": "https://github.com/<...>/n8n-nodes-<...>.git"
     },
+    "engines": {
+        "node": ">=24 <25"
+    },
     "scripts": {
         "build": "n8n-node build",
         "build:watch": "tsc --watch",
