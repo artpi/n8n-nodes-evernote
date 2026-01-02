@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const EvernoteSDK = require('evernote');
+import EvernoteSDK from 'evernote';
 import type {
 	IDataObject,
 	IExecuteFunctions,

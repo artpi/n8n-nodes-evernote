@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Evernote = require('evernote');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const sanitizeHtml = require('sanitize-html');
+import Evernote from 'evernote';
+import sanitizeHtml from 'sanitize-html';
 import type { IExecuteFunctions } from 'n8n-workflow';
+
+type EvernoteResource = InstanceType<typeof Evernote.Types.Resource>;
 
 const enmlDocType = '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
 
@@ -105,7 +105,7 @@ export const enmlToHtml = (enml: string): string => {
 };
 
 export interface ResourceBuildResult {
-	resources: any[];
+	resources: EvernoteResource[];
 	mediaTags: string[];
 }
 
@@ -114,7 +114,7 @@ export const buildResourcesFromBinary = async (
 	itemIndex: number,
 	propertyNames: string[],
 ): Promise<ResourceBuildResult> => {
-	const resources: any[] = [];
+	const resources: EvernoteResource[] = [];
 	const mediaTags: string[] = [];
 	for (const propertyName of propertyNames) {
 		executor.helpers.assertBinaryData(itemIndex, propertyName);
@@ -127,8 +127,14 @@ export const buildResourcesFromBinary = async (
 			size: buffer.length,
 			bodyHash,
 		});
+		const fileNameValue =
+			typeof binaryData?.fileName === 'string'
+				? binaryData.fileName
+				: typeof binaryData?.file === 'string'
+					? binaryData.file
+					: propertyName;
 		const attributes = new Evernote.Types.ResourceAttributes({
-			fileName: binaryData?.fileName || binaryData?.file || propertyName,
+			fileName: fileNameValue,
 		});
 		const resource = new Evernote.Types.Resource({
 			data,
