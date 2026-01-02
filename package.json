@@ -48,6 +48,7 @@
         "n8n-workflow": "*"
     },
     "dependencies": {
-        "evernote": "^2.0.5"
+        "evernote": "^2.0.5",
+        "sanitize-html": "^2.17.0"
     }
 }
