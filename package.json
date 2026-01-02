@@ -15,15 +15,16 @@
         "type": "git",
         "url": "https://github.com/<...>/n8n-nodes-<...>.git"
     },
-   "scripts": {
-		"build": "n8n-node build",
-		"build:watch": "tsc --watch",
-		"dev": "n8n-node dev",
-		"lint": "n8n-node lint",
-		"lint:fix": "n8n-node lint --fix",
-		"release": "n8n-node release",
-		"prepublishOnly": "n8n-node prerelease"
-	},
+    "scripts": {
+        "build": "n8n-node build",
+        "build:watch": "tsc --watch",
+        "dev": "n8n-node dev",
+        "lint": "n8n-node lint",
+        "lint:fix": "n8n-node lint --fix",
+        "release": "n8n-node release",
+        "test-connection": "node test-connection.js",
+        "prepublishOnly": "n8n-node prerelease"
+    },
     "files": [
         "dist"
     ],
@@ -37,6 +38,7 @@
     },
     "devDependencies": {
         "@n8n/node-cli": "*",
+        "dotenv": "^17.2.3",
         "eslint": "9.32.0",
         "prettier": "3.6.2",
         "release-it": "^19.0.4",
@@ -44,5 +46,8 @@
     },
     "peerDependencies": {
         "n8n-workflow": "*"
+    },
+    "dependencies": {
+        "evernote": "^2.0.5"
     }
 }
