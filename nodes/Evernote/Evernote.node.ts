@@ -308,6 +308,57 @@ export class Evernote implements INodeType {
 					'Optional note attributes as JSON (e.g. {"sourceURL": "https://example.com"})',
 			},
 			{
+				displayName: 'Note Attributes',
+				name: 'noteAttributesUi',
+				type: 'collection',
+				placeholder: 'Add Attribute',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Author',
+						name: 'author',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Latitude',
+						name: 'latitude',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Longitude',
+						name: 'longitude',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Place Name',
+						name: 'placeName',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Source',
+						name: 'source',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Source URL',
+						name: 'sourceURL',
+						type: 'string',
+						default: '',
+					},
+				],
+			},
+			{
 				displayName: 'Add Attachments',
 				name: 'addAttachments',
 				type: 'boolean',
@@ -471,6 +522,7 @@ export class Evernote implements INodeType {
 						const notebookGuid = this.getNodeParameter('notebookGuid', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
 						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
+						const noteAttributesUi = this.getNodeParameter('noteAttributesUi', itemIndex, {}) as IDataObject;
 						const addAttachments = this.getNodeParameter('addAttachments', itemIndex, false) as boolean;
 						const binaryPropertyNamesRaw = this.getNodeParameter('binaryPropertyNames', itemIndex, 'data') as string;
 
@@ -494,15 +546,25 @@ export class Evernote implements INodeType {
 						const tagNames = splitTags(tagsRaw);
 						const resources = attachmentResult?.resources;
 						let attributes: NoteAttributes | undefined;
+						const attributesObj: Record<string, unknown> = {};
+
 						if (attributesJson) {
 							try {
 								const parsed = JSON.parse(attributesJson);
-								attributes = new EvernoteSDK.Types.NoteAttributes(parsed);
+								Object.assign(attributesObj, parsed);
 							} catch {
 								throw new NodeOperationError(this.getNode(), 'Invalid JSON in Note Attributes', {
 									itemIndex,
 								});
 							}
+						}
+
+						if (Object.keys(noteAttributesUi).length > 0) {
+							Object.assign(attributesObj, noteAttributesUi);
+						}
+
+						if (Object.keys(attributesObj).length > 0) {
+							attributes = new EvernoteSDK.Types.NoteAttributes(attributesObj);
 						}
 
 						// Build note object with only the fields that have actual values
@@ -558,6 +620,7 @@ export class Evernote implements INodeType {
 						const titleUpdate = this.getNodeParameter('titleUpdate', itemIndex, '') as string;
 						const notebookGuidUpdate = this.getNodeParameter('notebookGuidUpdate', itemIndex, '') as string;
 						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
+						const noteAttributesUi = this.getNodeParameter('noteAttributesUi', itemIndex, {}) as IDataObject;
 						const searchValue = this.getNodeParameter('searchValue', itemIndex, '') as string;
 						const useRegex = this.getNodeParameter('useRegex', itemIndex, false) as boolean;
 						const caseSensitive = this.getNodeParameter('caseSensitive', itemIndex, false) as boolean;
@@ -635,15 +698,25 @@ export class Evernote implements INodeType {
 
 						const tagNames = splitTags(tagsRaw);
 						let attributes: NoteAttributes | undefined;
+						const attributesObj: Record<string, unknown> = {};
+
 						if (attributesJson) {
 							try {
 								const parsed = JSON.parse(attributesJson);
-								attributes = new EvernoteSDK.Types.NoteAttributes(parsed);
+								Object.assign(attributesObj, parsed);
 							} catch {
 								throw new NodeOperationError(this.getNode(), 'Invalid JSON in Note Attributes', {
 									itemIndex,
 								});
 							}
+						}
+
+						if (Object.keys(noteAttributesUi).length > 0) {
+							Object.assign(attributesObj, noteAttributesUi);
+						}
+
+						if (Object.keys(attributesObj).length > 0) {
+							attributes = new EvernoteSDK.Types.NoteAttributes(attributesObj);
 						}
 
 						// Build note object - title is required, use new title or existing
