@@ -68,6 +68,7 @@ declare module 'evernote' {
 				guid?: string;
 				title?: string;
 				content?: string;
+				contentHash?: Buffer;
 			}
 		}
 

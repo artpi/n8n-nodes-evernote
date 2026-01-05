@@ -1,9 +1,10 @@
 import { createHash } from 'crypto';
 import Evernote from 'evernote';
 import sanitizeHtml from 'sanitize-html';
-import type { IExecuteFunctions } from 'n8n-workflow';
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 
 type EvernoteResource = InstanceType<typeof Evernote.Types.Resource>;
+type EvernoteNote = InstanceType<typeof Evernote.Types.Note>;
 
 const enmlDocType = '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
 
@@ -158,9 +159,10 @@ export const parseBinaryPropertyNames = (raw: string | undefined): string[] =>
 		.map((name) => name.trim())
 		.filter((name) => name.length > 0) ?? [];
 
-export const transformNote = (note: any): any => {
+export const transformNote = (note: EvernoteNote): IDataObject => {
+	const response = note as unknown as IDataObject;
 	if (note.contentHash) {
-		note.contentHash = Buffer.from(note.contentHash).toString('hex');
+		response.contentHash = Buffer.from(note.contentHash).toString('hex');
 	}
-	return note;
+	return response;
 };
