@@ -278,6 +278,25 @@ export class Evernote implements INodeType {
 				description: 'Notebook to place the note in (optional)',
 			},
 			{
+				displayName: 'Tags Mode',
+				name: 'tagsMode',
+				type: 'options',
+				options: [
+					{ name: 'Replace', value: 'replace', description: 'Replace all tags with the provided list' },
+					{ name: 'Add', value: 'add', description: 'Add provided tags to existing tags' },
+					{ name: 'Remove', value: 'remove', description: 'Remove provided tags from existing tags' },
+					{ name: 'Don\'t Change Tags', value: 'ignore', description: 'Do not modify tags' },
+				],
+				default: 'replace',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+					},
+				},
+				description: 'How to handle tags when updating',
+			},
+			{
 				displayName: 'Tags',
 				name: 'tags',
 				type: 'string',
@@ -286,6 +305,9 @@ export class Evernote implements INodeType {
 					show: {
 						resource: ['note'],
 						operation: ['create', 'update'],
+					},
+					hide: {
+						tagsMode: ['ignore'],
 					},
 				},
 				description: 'Comma-separated list of tags',
@@ -617,6 +639,7 @@ export class Evernote implements INodeType {
 						const plainContent = this.getNodeParameter('content', itemIndex, '') as string;
 						const htmlContent = this.getNodeParameter('contentHtml', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
+						const tagsMode = this.getNodeParameter('tagsMode', itemIndex, 'replace') as string;
 						const titleUpdate = this.getNodeParameter('titleUpdate', itemIndex, '') as string;
 						const notebookGuidUpdate = this.getNodeParameter('notebookGuidUpdate', itemIndex, '') as string;
 						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
@@ -696,7 +719,20 @@ export class Evernote implements INodeType {
 
 						const resources = attachmentResult?.resources;
 
-						const tagNames = splitTags(tagsRaw);
+						let tagNames: string[] = [];
+						if (tagsMode !== 'ignore') {
+							tagNames = splitTags(tagsRaw);
+						}
+
+						if (tagsMode === 'add' || tagsMode === 'remove') {
+							const existingTagNames = await noteStore.getNoteTagNames(noteGuid);
+							if (tagsMode === 'add') {
+								tagNames = [...new Set([...existingTagNames, ...tagNames])];
+							} else if (tagsMode === 'remove') {
+								tagNames = existingTagNames.filter((tag: string) => !tagNames.includes(tag));
+							}
+						}
+
 						let attributes: NoteAttributes | undefined;
 						const attributesObj: Record<string, unknown> = {};
 
@@ -727,7 +763,7 @@ export class Evernote implements INodeType {
 						};
 
 						// Only include optional fields if they have actual values
-						if (tagNames.length) {
+						if (tagsMode !== 'ignore') {
 							noteData.tagNames = tagNames;
 						}
 						if (resources) {
