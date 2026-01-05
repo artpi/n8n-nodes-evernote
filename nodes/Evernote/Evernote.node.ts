@@ -14,8 +14,11 @@ import {
 	parseBinaryPropertyNames,
 	plainTextToEnml,
 	sanitizeHtmlToEnml,
+	transformNote,
 	wrapEnmlBody,
 } from './utils';
+
+type NoteAttributes = InstanceType<typeof EvernoteSDK.Types.NoteAttributes>;
 
 const splitTags = (raw: string): string[] =>
 	raw
@@ -87,7 +90,7 @@ export class Evernote implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'List', value: 'list', description: 'List notebooks', action: 'List a notebook' },
+					{ name: 'List', value: 'list', description: 'List notebooks', action: 'List notebooks' },
 				],
 				default: 'list',
 			},
@@ -102,7 +105,7 @@ export class Evernote implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'List', value: 'list', description: 'List tags', action: 'List a tag' },
+					{ name: 'List', value: 'list', description: 'List tags', action: 'List tags' },
 				],
 				default: 'list',
 			},
@@ -136,11 +139,77 @@ export class Evernote implements INodeType {
 				default: '',
 				description: 'Title of the note',
 			},
+			// Note update specific
 			{
-				displayName: 'Content Mode',
+				displayName: 'Content Editing Mode',
+				name: 'contentEditingMode',
+				type: 'options',
+				options: [
+					{ name: 'Append to Content', value: 'append', description: 'Append provided content to existing content' },
+					{ name: 'Keep Existing Content', value: 'keep', description: 'Do not modify the content body' },
+					{ name: 'Replace Content', value: 'replace', description: 'Replace the note content with provided content' },
+					{
+						name: 'Search & Replace in Content',
+						value: 'searchReplace',
+						description: 'Search and replace text inside the existing content',
+					},
+				],
+				default: 'replace',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+					},
+				},
+				description: 'How to edit the note content when updating',
+			},
+			{
+				displayName: 'Search Text / Pattern',
+				name: 'searchValue',
+				type: 'string',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+						contentEditingMode: ['searchReplace'],
+					},
+				},
+				description:
+					'Text or (if enabled) regular expression pattern to search for in the existing content',
+			},
+			{
+				displayName: 'Use Regular Expression',
+				name: 'useRegex',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+						contentEditingMode: ['searchReplace'],
+					},
+				},
+				description: 'Whether Search Text / Pattern should be treated as a regular expression',
+			},
+			{
+				displayName: 'Case Sensitive',
+				name: 'caseSensitive',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+						contentEditingMode: ['searchReplace'],
+					},
+				},
+				description: 'Whether search should be case sensitive',
+			},
+			{
+				displayName: 'Content Format',
 				name: 'contentMode',
 				type: 'options',
-				required: true,
 				options: [
 					{ name: 'Plain Text', value: 'plainText' },
 					{ name: 'HTML', value: 'html' },
@@ -151,13 +220,15 @@ export class Evernote implements INodeType {
 						resource: ['note'],
 						operation: ['create', 'update'],
 					},
+					hide: {
+						contentEditingMode: ['keep'],
+					},
 				},
 			},
 			{
 				displayName: 'Content',
 				name: 'content',
 				type: 'string',
-				required: true,
 				typeOptions: {
 					rows: 5,
 				},
@@ -166,16 +237,18 @@ export class Evernote implements INodeType {
 					show: {
 						resource: ['note'],
 						operation: ['create', 'update'],
-						contentMode: ['plainText'],
+					},
+					hide: {
+						contentMode: ['html'],
+						contentEditingMode: ['keep'],
 					},
 				},
-				description: 'Plain text to store in the note',
+				description: 'Plain text content. In Search & Replace mode, this is the replacement text.',
 			},
 			{
 				displayName: 'HTML Content',
 				name: 'contentHtml',
 				type: 'string',
-				required: true,
 				typeOptions: {
 					rows: 6,
 				},
@@ -184,10 +257,13 @@ export class Evernote implements INodeType {
 					show: {
 						resource: ['note'],
 						operation: ['create', 'update'],
-						contentMode: ['html'],
+					},
+					hide: {
+						contentMode: ['plainText'],
+						contentEditingMode: ['keep'],
 					},
 				},
-				description: 'HTML content that will be sanitized into ENML',
+				description: 'HTML content. In Search & Replace mode, this is the replacement text.',
 			},
 			{
 				displayName: 'Notebook GUID',
@@ -203,6 +279,25 @@ export class Evernote implements INodeType {
 				description: 'Notebook to place the note in (optional)',
 			},
 			{
+				displayName: 'Tags Mode',
+				name: 'tagsMode',
+				type: 'options',
+				options: [
+					{ name: 'Replace', value: 'replace', description: 'Replace all tags with the provided list' },
+					{ name: 'Add', value: 'add', description: 'Add provided tags to existing tags' },
+					{ name: 'Remove', value: 'remove', description: 'Remove provided tags from existing tags' },
+					{ name: 'Don\'t Change Tags', value: 'ignore', description: 'Do not modify tags' },
+				],
+				default: 'replace',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+					},
+				},
+				description: 'How to handle tags when updating',
+			},
+			{
 				displayName: 'Tags',
 				name: 'tags',
 				type: 'string',
@@ -212,8 +307,79 @@ export class Evernote implements INodeType {
 						resource: ['note'],
 						operation: ['create', 'update'],
 					},
+					hide: {
+						tagsMode: ['ignore'],
+					},
 				},
 				description: 'Comma-separated list of tags',
+			},
+			{
+				displayName: 'Note Attributes (JSON)',
+				name: 'attributesJson',
+				type: 'string',
+				typeOptions: {
+					rows: 4,
+				},
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['create', 'update'],
+					},
+				},
+				description:
+					'Optional note attributes as JSON (e.g. {"sourceURL": "https://example.com"})',
+			},
+			{
+				displayName: 'Note Attributes',
+				name: 'noteAttributesUi',
+				type: 'collection',
+				placeholder: 'Add Attribute',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Author',
+						name: 'author',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Latitude',
+						name: 'latitude',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Longitude',
+						name: 'longitude',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Place Name',
+						name: 'placeName',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Source',
+						name: 'source',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Source URL',
+						name: 'sourceURL',
+						type: 'string',
+						default: '',
+					},
+				],
 			},
 			{
 				displayName: 'Add Attachments',
@@ -242,28 +408,11 @@ export class Evernote implements INodeType {
 				},
 				description: 'Comma-separated list of binary properties to attach as resources',
 			},
-			// Note update specific
-			{
-				displayName: 'Update Mode',
-				name: 'updateMode',
-				type: 'options',
-				options: [
-					{ name: 'Replace', value: 'replace', description: 'Replace the content' },
-					{ name: 'Append', value: 'append', description: 'Append to existing content' },
-				],
-				default: 'replace',
-				displayOptions: {
-					show: {
-						resource: ['note'],
-						operation: ['update'],
-					},
-				},
-				description: 'Whether to replace or append the provided content',
-			},
 			{
 				displayName: 'New Title',
 				name: 'titleUpdate',
 				type: 'string',
+				placeholder: 'Do not change',
 				default: '',
 				displayOptions: {
 					show: {
@@ -272,6 +421,20 @@ export class Evernote implements INodeType {
 					},
 				},
 				description: 'Optionally replace the title',
+			},
+			{
+				displayName: 'Notebook GUID',
+				name: 'notebookGuidUpdate',
+				type: 'string',
+				placeholder: 'Do not change',
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['update'],
+					},
+				},
+				description: 'Notebook to move the note to (optional)',
 			},
 			// Note read
 			{
@@ -326,7 +489,8 @@ export class Evernote implements INodeType {
 				type: 'options',
 				options: [
 					{ name: 'Metadata Only', value: 'metadata' },
-					{ name: 'Full Notes', value: 'full' },
+					{ name: 'Metadata + Content', value: 'content' },
+					{ name: 'Metadata + Content + Media', value: 'media' },
 				],
 				default: 'metadata',
 				displayOptions: {
@@ -335,7 +499,27 @@ export class Evernote implements INodeType {
 						operation: ['search'],
 					},
 				},
-				description: 'Default metadata; choose full to fetch complete notes',
+				description: 'What information to return',
+			},
+			{
+				displayName: 'Content Format',
+				name: 'searchReturnContentFormat',
+				type: 'options',
+				options: [
+					{ name: 'ENML', value: 'enml' },
+					{ name: 'HTML', value: 'html' },
+				],
+				default: 'enml',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['search'],
+					},
+					hide: {
+						returnMode: ['metadata'],
+					},
+				},
+				description: 'Format of the returned content',
 			},
 			{
 				displayName: 'Limit',
@@ -381,6 +565,8 @@ export class Evernote implements INodeType {
 						const htmlContent = this.getNodeParameter('contentHtml', itemIndex, '') as string;
 						const notebookGuid = this.getNodeParameter('notebookGuid', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
+						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
+						const noteAttributesUi = this.getNodeParameter('noteAttributesUi', itemIndex, {}) as IDataObject;
 						const addAttachments = this.getNodeParameter('addAttachments', itemIndex, false) as boolean;
 						const binaryPropertyNamesRaw = this.getNodeParameter('binaryPropertyNames', itemIndex, 'data') as string;
 
@@ -403,17 +589,51 @@ export class Evernote implements INodeType {
 							: baseContent;
 						const tagNames = splitTags(tagsRaw);
 						const resources = attachmentResult?.resources;
+						let attributes: NoteAttributes | undefined;
+						const attributesObj: Record<string, unknown> = {};
 
-						const note = new EvernoteSDK.Types.Note({
+						if (attributesJson) {
+							try {
+								const parsed = JSON.parse(attributesJson);
+								Object.assign(attributesObj, parsed);
+							} catch {
+								throw new NodeOperationError(this.getNode(), 'Invalid JSON in Note Attributes', {
+									itemIndex,
+								});
+							}
+						}
+
+						if (Object.keys(noteAttributesUi).length > 0) {
+							Object.assign(attributesObj, noteAttributesUi);
+						}
+
+						if (Object.keys(attributesObj).length > 0) {
+							attributes = new EvernoteSDK.Types.NoteAttributes(attributesObj);
+						}
+
+						// Build note object with only the fields that have actual values
+						const noteData: Record<string, unknown> = {
 							title,
 							content: contentWithMedia,
-							notebookGuid: notebookGuid || undefined,
-							resources,
-							tagNames: tagNames.length ? tagNames : undefined,
-						});
+						};
+
+						if (notebookGuid) {
+							noteData.notebookGuid = notebookGuid;
+						}
+						if (resources) {
+							noteData.resources = resources;
+						}
+						if (tagNames.length) {
+							noteData.tagNames = tagNames;
+						}
+						if (attributes) {
+							noteData.attributes = attributes;
+						}
+
+						const note = new EvernoteSDK.Types.Note(noteData);
 
 						const created = await noteStore.createNote(note);
-						returnData.push({ json: created as unknown as IDataObject });
+						returnData.push({ json: transformNote(created) as unknown as IDataObject });
 						continue;
 					}
 
@@ -422,10 +642,10 @@ export class Evernote implements INodeType {
 						const returnContent = this.getNodeParameter('returnContent', itemIndex, 'enml') as string;
 
 						const note = await noteStore.getNote(noteGuid, true, true, true, true);
-						const output: IDataObject = note as unknown as IDataObject;
+						const output: IDataObject = transformNote(note) as unknown as IDataObject;
 
 						if (returnContent === 'html' && note.content) {
-							output.contentHtml = enmlToHtml(note.content);
+							output.content = enmlToHtml(note.content);
 						} else if (returnContent === 'none') {
 							delete output.content;
 						}
@@ -436,12 +656,19 @@ export class Evernote implements INodeType {
 
 					if (operation === 'update') {
 						const noteGuid = this.getNodeParameter('noteGuid', itemIndex) as string;
-						const updateMode = this.getNodeParameter('updateMode', itemIndex) as string;
-						const contentMode = this.getNodeParameter('contentMode', itemIndex) as string;
+						const contentEditingMode = this.getNodeParameter('contentEditingMode', itemIndex, 'replace') as string;
+						const contentMode = this.getNodeParameter('contentMode', itemIndex, 'plainText') as string;
 						const plainContent = this.getNodeParameter('content', itemIndex, '') as string;
 						const htmlContent = this.getNodeParameter('contentHtml', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
+						const tagsMode = this.getNodeParameter('tagsMode', itemIndex, 'replace') as string;
 						const titleUpdate = this.getNodeParameter('titleUpdate', itemIndex, '') as string;
+						const notebookGuidUpdate = this.getNodeParameter('notebookGuidUpdate', itemIndex, '') as string;
+						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
+						const noteAttributesUi = this.getNodeParameter('noteAttributesUi', itemIndex, {}) as IDataObject;
+						const searchValue = this.getNodeParameter('searchValue', itemIndex, '') as string;
+						const useRegex = this.getNodeParameter('useRegex', itemIndex, false) as boolean;
+						const caseSensitive = this.getNodeParameter('caseSensitive', itemIndex, false) as boolean;
 						const addAttachments = this.getNodeParameter('addAttachments', itemIndex, false) as boolean;
 						const binaryPropertyNamesRaw = this.getNodeParameter('binaryPropertyNames', itemIndex, 'data') as string;
 
@@ -453,17 +680,58 @@ export class Evernote implements INodeType {
 							)
 							: undefined;
 
-						let newContent =
-							contentMode === 'html'
-								? sanitizeHtmlToEnml(htmlContent)
-								: plainTextToEnml(plainContent);
+						// We need to fetch the existing note to get the current title (required for update)
+						// and potentially the content for keep/append/searchReplace modes
+						const needsExistingContent = ['keep', 'append', 'searchReplace'].includes(contentEditingMode);
+						// Always fetch note (for title), but only include content when needed
+						const existingNote = await noteStore.getNote(noteGuid, needsExistingContent || !titleUpdate, false, false, false);
 
-						if (updateMode === 'append') {
-							const existing = await noteStore.getNote(noteGuid, true, false, false, false);
-							const existingBody = extractEnmlBody(existing.content || '');
-							const newBody = extractEnmlBody(newContent);
+						let newContent = '';
+						if (contentEditingMode === 'keep') {
+							newContent = existingNote.content || wrapEnmlBody('');
+						} else if (contentEditingMode === 'replace') {
+							newContent =
+								contentMode === 'html'
+									? sanitizeHtmlToEnml(htmlContent)
+									: plainTextToEnml(plainContent);
+						} else if (contentEditingMode === 'append') {
+							const existingBody = extractEnmlBody(existingNote.content || '');
+							const newPart =
+								contentMode === 'html'
+									? sanitizeHtmlToEnml(htmlContent)
+									: plainTextToEnml(plainContent);
+							const newBody = extractEnmlBody(newPart);
 							const combined = `${existingBody}${newBody}`;
 							newContent = wrapEnmlBody(combined);
+						} else if (contentEditingMode === 'searchReplace') {
+							const existingBody = extractEnmlBody(existingNote.content || '');
+							if (!searchValue) {
+								throw new NodeOperationError(
+									this.getNode(),
+									'"Search Text / Pattern" is required when using Search & Replace mode',
+									{ itemIndex },
+								);
+							}
+							let pattern = searchValue;
+							if (!useRegex) {
+								pattern = searchValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+							}
+							let regex: RegExp;
+							try {
+								regex = new RegExp(pattern, caseSensitive ? 'g' : 'gi');
+							} catch {
+								throw new NodeOperationError(
+									this.getNode(),
+									'Invalid regular expression for Search Text / Pattern',
+									{
+										itemIndex,
+									},
+								);
+							}
+							// Use content/htmlContent as the replacement text
+							const replaceValue = contentMode === 'html' ? htmlContent : plainContent;
+							const replacedBody = existingBody.replace(regex, replaceValue);
+							newContent = wrapEnmlBody(replacedBody);
 						}
 
 						if (attachmentResult?.mediaTags?.length) {
@@ -473,17 +741,67 @@ export class Evernote implements INodeType {
 
 						const resources = attachmentResult?.resources;
 
-						const tagNames = splitTags(tagsRaw);
-						const note = new EvernoteSDK.Types.Note({
+						let tagNames: string[] = [];
+						if (tagsMode !== 'ignore') {
+							tagNames = splitTags(tagsRaw);
+						}
+
+						if (tagsMode === 'add' || tagsMode === 'remove') {
+							const existingTagNames = await noteStore.getNoteTagNames(noteGuid);
+							if (tagsMode === 'add') {
+								tagNames = [...new Set([...existingTagNames, ...tagNames])];
+							} else if (tagsMode === 'remove') {
+								tagNames = existingTagNames.filter((tag: string) => !tagNames.includes(tag));
+							}
+						}
+
+						let attributes: NoteAttributes | undefined;
+						const attributesObj: Record<string, unknown> = {};
+
+						if (attributesJson) {
+							try {
+								const parsed = JSON.parse(attributesJson);
+								Object.assign(attributesObj, parsed);
+							} catch {
+								throw new NodeOperationError(this.getNode(), 'Invalid JSON in Note Attributes', {
+									itemIndex,
+								});
+							}
+						}
+
+						if (Object.keys(noteAttributesUi).length > 0) {
+							Object.assign(attributesObj, noteAttributesUi);
+						}
+
+						if (Object.keys(attributesObj).length > 0) {
+							attributes = new EvernoteSDK.Types.NoteAttributes(attributesObj);
+						}
+
+						// Build note object - title is required, use new title or existing
+						const noteData: Record<string, unknown> = {
 							guid: noteGuid,
+							title: titleUpdate || existingNote.title,
 							content: newContent,
-							tagNames: tagNames.length ? tagNames : undefined,
-							title: titleUpdate || undefined,
-							resources,
-						});
+						};
+
+						// Only include optional fields if they have actual values
+						if (tagsMode !== 'ignore') {
+							noteData.tagNames = tagNames;
+						}
+						if (resources) {
+							noteData.resources = resources;
+						}
+						if (notebookGuidUpdate) {
+							noteData.notebookGuid = notebookGuidUpdate;
+						}
+						if (attributes) {
+							noteData.attributes = attributes;
+						}
+
+						const note = new EvernoteSDK.Types.Note(noteData);
 
 						const updated = await noteStore.updateNote(note);
-						returnData.push({ json: updated as unknown as IDataObject });
+						returnData.push({ json: transformNote(updated) as unknown as IDataObject });
 						continue;
 					}
 
@@ -498,6 +816,7 @@ export class Evernote implements INodeType {
 						const query = this.getNodeParameter('query', itemIndex) as string;
 						const notebookGuid = this.getNodeParameter('searchNotebookGuid', itemIndex, '') as string;
 						const returnMode = this.getNodeParameter('returnMode', itemIndex, 'metadata') as string;
+						const searchReturnContentFormat = this.getNodeParameter('searchReturnContentFormat', itemIndex, 'enml') as string;
 						const limit = this.getNodeParameter('limit', itemIndex, 50) as number;
 
 						const filter = new EvernoteSDK.NoteStore.NoteFilter({
@@ -519,14 +838,29 @@ export class Evernote implements INodeType {
 
 						if (returnMode === 'metadata') {
 							for (const note of searchResult.notes) {
-								returnData.push({ json: note as unknown as IDataObject });
+								returnData.push({ json: transformNote(note) as unknown as IDataObject });
 							}
 							continue;
 						}
 
 						for (const meta of searchResult.notes) {
-							const fullNote = await noteStore.getNote(meta.guid, true, true, true, true);
-							returnData.push({ json: fullNote as unknown as IDataObject });
+							// If returnMode is 'content', we fetch content but no resources
+							// If returnMode is 'media', we fetch everything
+							const withResources = returnMode === 'media';
+							const fullNote = await noteStore.getNote(
+								meta.guid,
+								true,           // withContent
+								withResources,  // withResourcesData
+								withResources,  // withResourcesRecognition
+								withResources,  // withResourcesAlternateData
+							);
+							const output: IDataObject = transformNote(fullNote) as unknown as IDataObject;
+
+							if (searchReturnContentFormat === 'html' && fullNote.content) {
+								output.content = enmlToHtml(fullNote.content);
+							}
+
+							returnData.push({ json: output });
 						}
 						continue;
 					}
@@ -552,19 +886,42 @@ export class Evernote implements INodeType {
 					itemIndex,
 				});
 			} catch (error) {
+				// Extract meaningful error message from Evernote API errors
+				let errorMessage: string;
+				if (error instanceof Error) {
+					errorMessage = error.message;
+				} else if (typeof error === 'object' && error !== null) {
+					// Evernote SDK errors often have errorCode and message properties
+					const errObj = error as Record<string, unknown>;
+					if (errObj.message) {
+						errorMessage = String(errObj.message);
+					} else if (errObj.errorCode) {
+						errorMessage = `Evernote API error code: ${errObj.errorCode}${errObj.parameter ? ` (parameter: ${errObj.parameter})` : ''}`;
+					} else {
+						errorMessage = JSON.stringify(error);
+					}
+				} else {
+					errorMessage = String(error);
+				}
+
+				// Add helpful context for common Evernote errors
+				if (errorMessage.includes('RTE room has already been open')) {
+					errorMessage += ' — The note is currently open in the Evernote editor. Please close it and try again.';
+				}
+
 				if (this.continueOnFail()) {
 					returnData.push({
 						json: this.getInputData(itemIndex)[0]?.json ?? {},
-						error,
+						error: new NodeOperationError(this.getNode(), errorMessage, { itemIndex }),
 						pairedItem: itemIndex,
 					});
 					continue;
 				}
-				if (error.context) {
-					error.context.itemIndex = itemIndex;
+				if (error && typeof error === 'object' && 'context' in error) {
+					(error as { context: { itemIndex: number } }).context.itemIndex = itemIndex;
 					throw error;
 				}
-				throw new NodeOperationError(this.getNode(), error as Error, {
+				throw new NodeOperationError(this.getNode(), errorMessage, {
 					itemIndex,
 				});
 			}

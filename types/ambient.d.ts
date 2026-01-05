@@ -6,7 +6,20 @@ declare module 'evernote' {
 			}
 
 			class ResourceAttributes {
-				constructor(args: { fileName?: string });
+				constructor(args: {
+					sourceURL?: string;
+					timestamp?: number;
+					latitude?: number;
+					longitude?: number;
+					altitude?: number;
+					cameraMake?: string;
+					cameraModel?: string;
+					clientWillIndex?: boolean;
+					recoType?: string;
+					fileName?: string;
+					attachment?: boolean;
+					applicationData?: Record<string, unknown>;
+				});
 			}
 
 			class Resource {
@@ -14,7 +27,30 @@ declare module 'evernote' {
 			}
 
 			class NoteAttributes {
-				constructor(args?: Record<string, unknown>);
+				constructor(args?: {
+					subjectDate?: number;
+					latitude?: number;
+					longitude?: number;
+					altitude?: number;
+					author?: string;
+					source?: string;
+					sourceURL?: string;
+					sourceApplication?: string;
+					shareDate?: number;
+					reminderOrder?: number;
+					reminderDoneTime?: number;
+					reminderTime?: number;
+					placeName?: string;
+					contentClass?: string;
+					applicationData?: Record<string, unknown>;
+					lastEditedBy?: string;
+					classifications?: Record<string, string>;
+					creatorId?: number;
+					lastEditorId?: number;
+					sharedWithBusiness?: boolean;
+					conflictSourceNoteGuid?: string;
+					noteTitleQuality?: number;
+				});
 			}
 
 			class Note {
@@ -32,6 +68,7 @@ declare module 'evernote' {
 				guid?: string;
 				title?: string;
 				content?: string;
+				contentHash?: Buffer;
 			}
 		}
 

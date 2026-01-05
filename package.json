@@ -38,9 +38,8 @@
       "dist/credentials/EvernoteApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/Example/Example.node.js",
-      "dist/nodes/Evernote/Evernote.node.js"
-    ]
+    "dist/nodes/Evernote/Evernote.node.js"
+  ]
   },
   "devDependencies": {
     "@n8n/node-cli": "*",
