@@ -90,7 +90,7 @@ export class Evernote implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'List', value: 'list', description: 'List notebooks', action: 'List a notebook' },
+					{ name: 'List', value: 'list', description: 'List notebooks', action: 'List notebooks' },
 				],
 				default: 'list',
 			},
@@ -105,7 +105,7 @@ export class Evernote implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'List', value: 'list', description: 'List tags', action: 'List a tag' },
+					{ name: 'List', value: 'list', description: 'List tags', action: 'List tags' },
 				],
 				default: 'list',
 			},
