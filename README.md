@@ -34,7 +34,13 @@ Node 24.x is required. Use `nvm use` (with the provided `.nvmrc`) or your versio
 ## Usage
 
 - **Content formats**: choose Plain Text (wrapped in ENML) or HTML (sanitized to ENML). When reading, you can request raw ENML or simplified HTML.
-- **Update modes**: replace overwrites content; append pulls the current note, adds your new content at the end, and saves.
+- **Content editing modes (Note → Update)**:
+	- **Replace Content**: rebuilds the note body from the provided Content/HTML Content.
+	- **Append to Content**: loads the existing body and appends the provided Content/HTML Content at the end.
+	- **Keep Existing Content**: leaves the body unchanged so you can update only title, tags, notebook, or attributes.
+	- **Search & Replace in Content**: loads the existing body and runs a text or regex search & replace before saving.
+- **Note attributes**: optional `Note Attributes (JSON)` field lets you send attributes such as `{"sourceURL": "https://example.com"}` on create/update.
+- **Independent updates**: with Keep Existing Content, you can move a note between notebooks, change tags, and update attributes or title without touching the body.
 - **Attachments**: enable “Add Attachments” and list binary property names (comma-separated). Attachments are hashed (MD5) and injected as `<en-media>` in the note.
 - **Search**: uses Evernote search grammar. Defaults to metadata; enable “Full Notes” to fetch complete notes.
 
