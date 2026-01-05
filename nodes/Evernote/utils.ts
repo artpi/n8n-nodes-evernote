@@ -101,7 +101,12 @@ export const enmlToHtml = (enml: string): string => {
 		.replace(/<\?xml[^>]*>/i, '')
 		.replace(/<!DOCTYPE[^>]*>/i, '')
 		.trim();
-	return withoutProlog.replace(/<en-note([^>]*)>/i, '<div$1>').replace(/<\/en-note>/i, '</div>');
+	return withoutProlog
+		.replace(/<en-note([^>]*)>/i, '<div$1>')
+		.replace(/<\/en-note>/i, '</div>')
+		.replace(/<en-todo checked="true"\s*\/?>/gi, '<input type="checkbox" checked disabled>')
+		.replace(/<en-todo checked="false"\s*\/?>/gi, '<input type="checkbox" disabled>')
+		.replace(/<en-todo\s*\/?>/gi, '<input type="checkbox" disabled>');
 };
 
 export interface ResourceBuildResult {
@@ -152,3 +157,10 @@ export const parseBinaryPropertyNames = (raw: string | undefined): string[] =>
 		?.split(',')
 		.map((name) => name.trim())
 		.filter((name) => name.length > 0) ?? [];
+
+export const transformNote = (note: any): any => {
+	if (note.contentHash) {
+		note.contentHash = Buffer.from(note.contentHash).toString('hex');
+	}
+	return note;
+};

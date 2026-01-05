@@ -14,6 +14,7 @@ import {
 	parseBinaryPropertyNames,
 	plainTextToEnml,
 	sanitizeHtmlToEnml,
+	transformNote,
 	wrapEnmlBody,
 } from './utils';
 
@@ -488,7 +489,8 @@ export class Evernote implements INodeType {
 				type: 'options',
 				options: [
 					{ name: 'Metadata Only', value: 'metadata' },
-					{ name: 'Full Notes', value: 'full' },
+					{ name: 'Metadata + Content', value: 'content' },
+					{ name: 'Metadata + Content + Media', value: 'media' },
 				],
 				default: 'metadata',
 				displayOptions: {
@@ -497,7 +499,27 @@ export class Evernote implements INodeType {
 						operation: ['search'],
 					},
 				},
-				description: 'Default metadata; choose full to fetch complete notes',
+				description: 'What information to return',
+			},
+			{
+				displayName: 'Content Format',
+				name: 'searchReturnContentFormat',
+				type: 'options',
+				options: [
+					{ name: 'ENML', value: 'enml' },
+					{ name: 'HTML', value: 'html' },
+				],
+				default: 'enml',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['search'],
+					},
+					hide: {
+						returnMode: ['metadata'],
+					},
+				},
+				description: 'Format of the returned content',
 			},
 			{
 				displayName: 'Limit',
@@ -611,7 +633,7 @@ export class Evernote implements INodeType {
 						const note = new EvernoteSDK.Types.Note(noteData);
 
 						const created = await noteStore.createNote(note);
-						returnData.push({ json: created as unknown as IDataObject });
+						returnData.push({ json: transformNote(created) as unknown as IDataObject });
 						continue;
 					}
 
@@ -620,10 +642,10 @@ export class Evernote implements INodeType {
 						const returnContent = this.getNodeParameter('returnContent', itemIndex, 'enml') as string;
 
 						const note = await noteStore.getNote(noteGuid, true, true, true, true);
-						const output: IDataObject = note as unknown as IDataObject;
+						const output: IDataObject = transformNote(note) as unknown as IDataObject;
 
 						if (returnContent === 'html' && note.content) {
-							output.contentHtml = enmlToHtml(note.content);
+							output.content = enmlToHtml(note.content);
 						} else if (returnContent === 'none') {
 							delete output.content;
 						}
@@ -779,7 +801,7 @@ export class Evernote implements INodeType {
 						const note = new EvernoteSDK.Types.Note(noteData);
 
 						const updated = await noteStore.updateNote(note);
-						returnData.push({ json: updated as unknown as IDataObject });
+						returnData.push({ json: transformNote(updated) as unknown as IDataObject });
 						continue;
 					}
 
@@ -794,6 +816,7 @@ export class Evernote implements INodeType {
 						const query = this.getNodeParameter('query', itemIndex) as string;
 						const notebookGuid = this.getNodeParameter('searchNotebookGuid', itemIndex, '') as string;
 						const returnMode = this.getNodeParameter('returnMode', itemIndex, 'metadata') as string;
+						const searchReturnContentFormat = this.getNodeParameter('searchReturnContentFormat', itemIndex, 'enml') as string;
 						const limit = this.getNodeParameter('limit', itemIndex, 50) as number;
 
 						const filter = new EvernoteSDK.NoteStore.NoteFilter({
@@ -815,14 +838,29 @@ export class Evernote implements INodeType {
 
 						if (returnMode === 'metadata') {
 							for (const note of searchResult.notes) {
-								returnData.push({ json: note as unknown as IDataObject });
+								returnData.push({ json: transformNote(note) as unknown as IDataObject });
 							}
 							continue;
 						}
 
 						for (const meta of searchResult.notes) {
-							const fullNote = await noteStore.getNote(meta.guid, true, true, true, true);
-							returnData.push({ json: fullNote as unknown as IDataObject });
+							// If returnMode is 'content', we fetch content but no resources
+							// If returnMode is 'media', we fetch everything
+							const withResources = returnMode === 'media';
+							const fullNote = await noteStore.getNote(
+								meta.guid,
+								true,           // withContent
+								withResources,  // withResourcesData
+								withResources,  // withResourcesRecognition
+								withResources,  // withResourcesAlternateData
+							);
+							const output: IDataObject = transformNote(fullNote) as unknown as IDataObject;
+
+							if (searchReturnContentFormat === 'html' && fullNote.content) {
+								output.content = enmlToHtml(fullNote.content);
+							}
+
+							returnData.push({ json: output });
 						}
 						continue;
 					}
