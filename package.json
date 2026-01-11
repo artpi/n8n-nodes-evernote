@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-evernote",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Evernote community node for n8n (notes, notebooks, tags)",
   "license": "MIT",
   "homepage": "",
