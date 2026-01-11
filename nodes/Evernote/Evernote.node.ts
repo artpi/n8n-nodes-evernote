@@ -213,6 +213,7 @@ export class Evernote implements INodeType {
 				options: [
 					{ name: 'Plain Text', value: 'plainText' },
 					{ name: 'HTML', value: 'html' },
+					{ name: 'ENML', value: 'enml' },
 				],
 				default: 'plainText',
 				displayOptions: {
@@ -239,7 +240,7 @@ export class Evernote implements INodeType {
 						operation: ['create', 'update'],
 					},
 					hide: {
-						contentMode: ['html'],
+						contentMode: ['html', 'enml'],
 						contentEditingMode: ['keep'],
 					},
 				},
@@ -257,13 +258,33 @@ export class Evernote implements INodeType {
 					show: {
 						resource: ['note'],
 						operation: ['create', 'update'],
+						contentMode: ['html'],
 					},
 					hide: {
-						contentMode: ['plainText'],
 						contentEditingMode: ['keep'],
 					},
 				},
 				description: 'HTML content. In Search & Replace mode, this is the replacement text.',
+			},
+			{
+				displayName: 'ENML Content',
+				name: 'contentEnml',
+				type: 'string',
+				typeOptions: {
+					rows: 6,
+				},
+				default: '',
+				displayOptions: {
+					show: {
+						resource: ['note'],
+						operation: ['create', 'update'],
+						contentMode: ['enml'],
+					},
+					hide: {
+						contentEditingMode: ['keep'],
+					},
+				},
+				description: 'Raw ENML content. Can be just the body content or full ENML document. In Search & Replace mode, this is the replacement text.',
 			},
 			{
 				displayName: 'Notebook GUID',
@@ -563,6 +584,7 @@ export class Evernote implements INodeType {
 						const contentMode = this.getNodeParameter('contentMode', itemIndex) as string;
 						const plainContent = this.getNodeParameter('content', itemIndex, '') as string;
 						const htmlContent = this.getNodeParameter('contentHtml', itemIndex, '') as string;
+						const enmlContent = this.getNodeParameter('contentEnml', itemIndex, '') as string;
 						const notebookGuid = this.getNodeParameter('notebookGuid', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
 						const attributesJson = this.getNodeParameter('attributesJson', itemIndex, '') as string;
@@ -578,10 +600,17 @@ export class Evernote implements INodeType {
 							)
 							: undefined;
 
-						const baseContent =
-							contentMode === 'html'
-								? sanitizeHtmlToEnml(htmlContent)
-								: plainTextToEnml(plainContent);
+						let baseContent: string;
+						if (contentMode === 'enml') {
+							// If ENML content already has the wrapper, use it; otherwise wrap it
+							baseContent = enmlContent.includes('<en-note')
+								? enmlContent
+								: wrapEnmlBody(enmlContent);
+						} else if (contentMode === 'html') {
+							baseContent = sanitizeHtmlToEnml(htmlContent);
+						} else {
+							baseContent = plainTextToEnml(plainContent);
+						}
 
 						const contentBody = extractEnmlBody(baseContent);
 						const contentWithMedia = attachmentResult?.mediaTags?.length
@@ -660,6 +689,7 @@ export class Evernote implements INodeType {
 						const contentMode = this.getNodeParameter('contentMode', itemIndex, 'plainText') as string;
 						const plainContent = this.getNodeParameter('content', itemIndex, '') as string;
 						const htmlContent = this.getNodeParameter('contentHtml', itemIndex, '') as string;
+						const enmlContent = this.getNodeParameter('contentEnml', itemIndex, '') as string;
 						const tagsRaw = this.getNodeParameter('tags', itemIndex, '') as string;
 						const tagsMode = this.getNodeParameter('tagsMode', itemIndex, 'replace') as string;
 						const titleUpdate = this.getNodeParameter('titleUpdate', itemIndex, '') as string;
@@ -690,16 +720,27 @@ export class Evernote implements INodeType {
 						if (contentEditingMode === 'keep') {
 							newContent = existingNote.content || wrapEnmlBody('');
 						} else if (contentEditingMode === 'replace') {
-							newContent =
-								contentMode === 'html'
-									? sanitizeHtmlToEnml(htmlContent)
-									: plainTextToEnml(plainContent);
+							if (contentMode === 'enml') {
+								newContent = enmlContent.includes('<en-note')
+									? enmlContent
+									: wrapEnmlBody(enmlContent);
+							} else if (contentMode === 'html') {
+								newContent = sanitizeHtmlToEnml(htmlContent);
+							} else {
+								newContent = plainTextToEnml(plainContent);
+							}
 						} else if (contentEditingMode === 'append') {
 							const existingBody = extractEnmlBody(existingNote.content || '');
-							const newPart =
-								contentMode === 'html'
-									? sanitizeHtmlToEnml(htmlContent)
-									: plainTextToEnml(plainContent);
+							let newPart: string;
+							if (contentMode === 'enml') {
+								newPart = enmlContent.includes('<en-note')
+									? enmlContent
+									: wrapEnmlBody(enmlContent);
+							} else if (contentMode === 'html') {
+								newPart = sanitizeHtmlToEnml(htmlContent);
+							} else {
+								newPart = plainTextToEnml(plainContent);
+							}
 							const newBody = extractEnmlBody(newPart);
 							const combined = `${existingBody}${newBody}`;
 							newContent = wrapEnmlBody(combined);
@@ -728,8 +769,8 @@ export class Evernote implements INodeType {
 									},
 								);
 							}
-							// Use content/htmlContent as the replacement text
-							const replaceValue = contentMode === 'html' ? htmlContent : plainContent;
+							// Use content/htmlContent/enmlContent as the replacement text
+							const replaceValue = contentMode === 'enml' ? enmlContent : (contentMode === 'html' ? htmlContent : plainContent);
 							const replacedBody = existingBody.replace(regex, replaceValue);
 							newContent = wrapEnmlBody(replacedBody);
 						}
